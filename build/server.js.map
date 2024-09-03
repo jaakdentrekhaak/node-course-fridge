@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/server.ts"],"sourcesContent":["import { App } from \"./app.js\";\n\nconst app = new App();\napp.listen();\n"],"names":["App","app","listen"],"mappings":"AAAA,SAASA,GAAG,QAAQ,WAAW;AAE/B,MAAMC,MAAM,IAAID;AAChBC,IAAIC,MAAM"}

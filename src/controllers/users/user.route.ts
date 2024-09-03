@@ -1,11 +1,11 @@
-import { Router } from "express";
+import { NextFunction, Request, Response, Router } from "express";
 import { getList } from "./handlers/getList.handler.js"
 import { create } from "./handlers/create.handler.js";
 import { get } from "./handlers/get.handler.js";
 import { update } from "./handlers/update.handler.js";
 import { deleteUser } from "./handlers/delete.handler.js";
 
-const adminMiddleware = (req, res, next) => {
+const adminMiddleware = (req: Request, res: Response, next: NextFunction) => {
 	if (req.header("x-auth") !== "api-key") {
 		return res.status(401).send("Unauthorized");
 	}
@@ -13,6 +13,8 @@ const adminMiddleware = (req, res, next) => {
 };
 
 export class UserRoute {
+    router: Router;
+    path: String;
     constructor() {
         this.router = Router();
         this.path = "users";
