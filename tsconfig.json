@@ -1,16 +1,18 @@
 {
-	"compilerOptions": {
-		"target": "esnext",
-		"experimentalDecorators": true,
-		"emitDecoratorMetadata": true,
-		"module": "nodenext",
-		"moduleResolution": "nodenext",
-		"allowJs": true,
-		"sourceMap": true,
-		"isolatedModules": true,
-		"allowSyntheticDefaultImports": true,
-		"esModuleInterop": true,
-		"forceConsistentCasingInFileNames": true,
-		"skipLibCheck": true
-	}
+  "compilerOptions": {
+    "target": "esnext",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "allowJs": true,
+    "sourceMap": true,
+    "isolatedModules": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "strictPropertyInitialization": false /* Check for class properties that are declared but not set in the constructor. */,
+    "strict": false /* Enable all strict type-checking options. */
+  }
 }
