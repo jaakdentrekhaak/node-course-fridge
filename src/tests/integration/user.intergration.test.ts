@@ -1,38 +1,42 @@
 import supertest from "supertest";
 import { App } from "../../app.js";
 import TestAgent from "supertest/lib/agent.js";
-import {
-  User,
-  UserStore,
-} from "../../controllers/users/handlers/user.store.js";
 import { expect } from "chai";
 import { StatusCode } from "@panenco/papi";
+import { MikroORM } from "@mikro-orm/core";
+import { PostgreSqlDriver } from "@mikro-orm/postgresql";
+import { User } from "../../entities/user.entity.js";
 
 describe("Integration tests", () => {
   describe("User Tests", () => {
     let request: TestAgent<supertest.Test>;
-    beforeEach(() => {
-      UserStore.users = [];
+    let orm: MikroORM<PostgreSqlDriver>;
+    before(async () => {
       const app = new App();
-
+      await app.createConnection();
+      orm = app.orm;
       request = supertest(app.host);
+    });
+
+    beforeEach(async () => {
+      await orm.em.execute(`DROP SCHEMA public CASCADE; CREATE SCHEMA public;`);
+      await orm.getMigrator().up();
     });
 
     it("should CRUD users", async () => {
       // create new user
-      const { body: createResponse } = await request
-        .post(`/api/users`)
-        .send({
-          name: "test",
-          email: "test-user+1@panenco.com",
-          password: "real secret stuff",
-        } as Omit<User, "id">)
-        .expect(StatusCode.created);
+      const { body: createResponse } = await request.post(`/api/users`).send({
+        name: "test",
+        email: "test-user+1@panenco.com",
+        password: "real secret stuff",
+      } as Omit<User, "id">);
 
-      expect(UserStore.users.some((x) => x.email === createResponse.email))
-        .true;
+      const createdUser = await orm.em
+        .fork()
+        .findOne(User, { id: createResponse.id });
+      expect(createdUser.name).equal("test");
 
-      // Log created user in
+      // login user
       const { body: loginBody } = await request
         .post(`/api/auth/tokens`)
         .send({
@@ -43,14 +47,14 @@ describe("Integration tests", () => {
 
       const token = loginBody.token;
 
-      // Get the newly created user
+      // get newly created user
       const { body: getResponse } = await request
         .get(`/api/users/${createResponse.id}`)
         .set("x-auth", token)
         .expect(StatusCode.ok);
       expect(getResponse.name).equal("test");
 
-      // Successfully update user
+      // update user
       const { body: updateResponse } = await request
         .patch(`/api/users/${createResponse.id}`)
         .send({
@@ -63,7 +67,7 @@ describe("Integration tests", () => {
       expect(updateResponse.email).equal("test-user+updated@panenco.com");
       expect(updateResponse.password).undefined; // middleware transformed the object to not include the password
 
-      // Get all users
+      // get all users
       const { body: getAllResponse } = await request
         .get(`/api/users`)
         .set("x-auth", token)
@@ -76,7 +80,7 @@ describe("Integration tests", () => {
       expect(newUser.email).equal("test-user+updated@panenco.com");
       expect(count).equal(1);
 
-      // Get the newly created user
+      // delete newly created user
       await request
         .delete(`/api/users/${createResponse.id}`)
         .set("x-auth", token)

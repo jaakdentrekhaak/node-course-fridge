@@ -12,9 +12,13 @@ import { validationMetadatasToSchemas } from "class-validator-jsonschema";
 import { getMetadataStorage } from "class-validator";
 import swaggerUi from "swagger-ui-express";
 import { routingControllersToSpec } from "routing-controllers-openapi";
+import { MikroORM, RequestContext } from "@mikro-orm/core";
+import { PostgreSqlDriver } from "@mikro-orm/postgresql";
+import ormConfig from "./orm.config.js";
 
 export class App {
   host: Application;
+  public orm: MikroORM<PostgreSqlDriver>;
   constructor() {
     // init server
     this.host = express();
@@ -27,6 +31,10 @@ export class App {
 
     this.host.get("/", (req: Request, res: Response, next: NextFunction) => {
       res.send("Hello World!");
+    });
+
+    this.host.use((req, __, next: NextFunction) => {
+      RequestContext.create(this.orm.em, next);
     });
 
     this.initializeControllers([AuthController, UserController]);
@@ -86,5 +94,13 @@ export class App {
     });
 
     this.host.use("/docs", swaggerUi.serve, swaggerUi.setup(spec));
+  }
+
+  public async createConnection() {
+    try {
+      this.orm = await MikroORM.init(ormConfig);
+    } catch (error) {
+      console.log("Error while connecting to the database", error);
+    }
   }
 }

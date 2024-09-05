@@ -1,11 +1,8 @@
-import { NextFunction, Request, Response, Router } from "express";
 import { getList } from "./handlers/getList.handler.js";
 import { create } from "./handlers/create.handler.js";
 import { get } from "./handlers/get.handler.js";
 import { update } from "./handlers/update.handler.js";
 import { deleteUser } from "./handlers/delete.handler.js";
-import { plainToInstance } from "class-transformer";
-import { validate } from "class-validator";
 import { UserBody } from "../../contracts/user.body.js";
 import { UserView } from "../../contracts/user.view.js";
 import {
@@ -16,7 +13,6 @@ import {
   Param,
   Patch,
   Post,
-  UseBefore,
 } from "routing-controllers";
 import {
   Body,

@@ -1,8 +1,4 @@
 import { expect } from "chai";
-import {
-  User,
-  UserStore,
-} from "../../controllers/users/handlers/user.store.js";
 import { getList } from "../../controllers/users/handlers/getList.handler.js";
 import { NextFunction, Request, Response } from "express";
 import { get } from "../../controllers/users/handlers/get.handler.js";
@@ -11,86 +7,115 @@ import { create } from "../../controllers/users/handlers/create.handler.js";
 import { UserView } from "../../contracts/user.view.js";
 import { update } from "../../controllers/users/handlers/update.handler.js";
 import { deleteUser } from "../../controllers/users/handlers/delete.handler.js";
+import { User } from "../../entities/user.entity.js";
+import { MikroORM, RequestContext } from "@mikro-orm/core";
+import { PostgreSqlDriver } from "@mikro-orm/postgresql";
+import ormConfig from "../../orm.config.js";
+import { randomUUID } from "crypto";
 
 const userFixtures: User[] = [
   {
     name: "test1",
     email: "test-user+1@panenco.com",
-    id: 0,
     password: "password1",
-  },
+  } as User,
   {
     name: "test2",
     email: "test-user+2@panenco.com",
-    id: 1,
     password: "password2",
-  },
+  } as User,
 ];
 
 describe("Handler tests", () => {
   describe("User tests", () => {
-    beforeEach(() => {
-      UserStore.users = [...userFixtures];
+    let orm: MikroORM<PostgreSqlDriver>;
+    let users: User[];
+    before(async () => {
+      orm = await MikroORM.init(ormConfig);
     });
 
-    it("should get users", () => {
-      const [res, count] = getList(null);
-
-      expect(res.some((x) => x.name === "test2")).true;
+    beforeEach(async () => {
+      await orm.em.execute(`DROP SCHEMA public CASCADE; CREATE SCHEMA public;`);
+      await orm.getMigrator().up();
+      const em = orm.em.fork();
+      users = userFixtures.map((x) => em.create(User, x));
+      await em.persistAndFlush(users);
     });
 
-    it("should search users", () => {
-      const [res, count] = getList("test1");
-      expect(res.some((x) => x.name === "test1")).true;
+    it("should get users", async () => {
+      await RequestContext.createAsync(orm.em.fork(), async () => {
+        const [res, count] = await getList(null);
+
+        expect(res.some((x) => x.name === "test2")).true;
+      });
     });
 
-    it("should get user by id", () => {
-      const res = get("1");
-
-      expect(res.name).equal("test2");
-      expect(res.email).equal("test-user+2@panenco.com");
+    it("should search users", async () => {
+      await RequestContext.createAsync(orm.em.fork(), async () => {
+        const [res, count] = await getList("test1");
+        expect(res.some((x) => x.name === "test1")).true;
+      });
     });
 
-    it("should fail when getting user by unknown id", () => {
-      try {
-        get("999");
-      } catch (error) {
-        expect(error.message).equal("User not found");
-        return;
-      }
-      expect(true, "should have thrown an error").false;
+    it("should get user by id", async () => {
+      await RequestContext.createAsync(orm.em.fork(), async () => {
+        const res = await get(users[1].id);
+
+        expect(res.name).equal("test2");
+        expect(res.email).equal("test-user+2@panenco.com");
+      });
+    });
+
+    it("should fail when getting user by unknown id", async () => {
+      await RequestContext.createAsync(orm.em.fork(), async () => {
+        try {
+          await get(randomUUID());
+        } catch (error) {
+          expect(error.message).equal("User not found");
+          return;
+        }
+        expect(true, "should have thrown an error").false;
+      });
     });
 
     it("should create user", async () => {
-      const body = {
-        email: "test-user+new@panenco.com",
-        name: "newUser",
-        password: "reallysecretstuff",
-      } as User;
-      const res = await create(body);
+      await RequestContext.createAsync(orm.em.fork(), async () => {
+        const body = {
+          email: "test-user+new@panenco.com",
+          name: "newUser",
+          password: "reallysecretstuff",
+        } as User;
+        const res = await create(body);
 
-      expect(res.name).equal("newUser");
-      expect(res.email).equal("test-user+new@panenco.com");
+        expect(res.name).equal("newUser");
+        expect(res.email).equal("test-user+new@panenco.com");
+      });
     });
 
     it("should update user", async () => {
-      const body = {
-        email: "test-user+updated@panenco.com",
-      } as User;
-      const id = 0;
-      const res = update(body, id.toString());
+      await RequestContext.createAsync(orm.em.fork(), async () => {
+        const body = {
+          email: "test-user+updated@panenco.com",
+        } as User;
+        const id = users[0].id;
+        const res = await update(body, id);
 
-      expect(res.email).equal(body.email);
-      expect(res.name).equal("test1");
-      expect(UserStore.users.find((x) => x.id === id).email).equal(body.email);
+        expect(res.email).equal(body.email);
+        expect(res.name).equal("test1");
+
+        const foundUser = await orm.em.findOne(User, { id });
+        expect(foundUser.email).equal(body.email);
+      });
     });
 
-    it("should delete user by id", () => {
-      const initialCount = UserStore.users.length;
-      deleteUser("1");
+    it("should delete user by id", async () => {
+      await RequestContext.createAsync(orm.em.fork(), async () => {
+        const initialCount = await orm.em.count(User);
+        await deleteUser(users[0].id);
 
-      expect(UserStore.users.some((x) => x.id === 1)).false;
-      expect(initialCount - 1).equal(UserStore.users.length);
+        const newCount = await orm.em.count(User);
+        expect(initialCount - 1).equal(newCount);
+      });
     });
   });
 });
