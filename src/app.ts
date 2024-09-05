@@ -1,5 +1,17 @@
+import "express-async-errors";
 import express, { Application, NextFunction, Request, Response } from "express";
-import { UserRoute } from "./controllers/users/user.route.js";
+import { UserController } from "./controllers/users/user.controller.js";
+import {
+  getMetadataArgsStorage,
+  RoutingControllersOptions,
+  useExpressServer,
+} from "routing-controllers";
+import { errorMiddleware, getAuthenticator } from "@panenco/papi";
+import { AuthController } from "./controllers/auth/auth.controller.js";
+import { validationMetadatasToSchemas } from "class-validator-jsonschema";
+import { getMetadataStorage } from "class-validator";
+import swaggerUi from "swagger-ui-express";
+import { routingControllersToSpec } from "routing-controllers-openapi";
 
 export class App {
   host: Application;
@@ -17,17 +29,11 @@ export class App {
       res.send("Hello World!");
     });
 
-    const usersRoute = new UserRoute();
-    this.host.use(`/api/${usersRoute.path}`, usersRoute.router);
+    this.initializeControllers([AuthController, UserController]);
 
-    this.host.use((req: Request, res: Response, next: NextFunction) => {
-      res.status(404).send("No Endpoint found");
-    });
+    this.host.use(errorMiddleware);
 
-    // Previous middleware will be skipped if we call `next` with an extra parameter
-    this.host.use((error, req, res, next) => {
-      res.status(400).json(error);
-    });
+    this.initializeSwagger();
   }
 
   listen() {
@@ -35,5 +41,50 @@ export class App {
       console.info(`🚀 http://localhost:3000`);
       console.info(`========================`);
     });
+  }
+
+  private initializeControllers(controllers: Function[]) {
+    useExpressServer(this.host, {
+      // Link the express host to routing-controllers
+      cors: {
+        origin: "*",
+        exposedHeaders: ["x-auth"],
+      },
+      controllers,
+      defaultErrorHandler: false, // Disable the default error handler. We will handle errors through papi.
+      routePrefix: "/api",
+      authorizationChecker: getAuthenticator("very_secret"), // Tell routing-controllers to use the papi authentication checker
+    });
+  }
+
+  private initializeSwagger() {
+    const schemas = validationMetadatasToSchemas({
+      classValidatorMetadataStorage: getMetadataStorage(),
+      refPointerPrefix: "#/components/schemas/",
+    });
+
+    const routingControllersOptions: RoutingControllersOptions = {
+      routePrefix: "/api",
+    };
+
+    const storage = getMetadataArgsStorage();
+    const spec = routingControllersToSpec(storage, routingControllersOptions, {
+      components: {
+        schemas,
+        securitySchemes: {
+          JWT: {
+            in: "header",
+            name: "x-auth",
+            type: "apiKey",
+            bearerFormat: "JWT",
+            description:
+              'JWT Authorization header using the JWT scheme. Example: "x-auth: {token}"',
+          },
+        },
+      },
+      security: [{ JWT: [] }],
+    });
+
+    this.host.use("/docs", swaggerUi.serve, swaggerUi.setup(spec));
   }
 }

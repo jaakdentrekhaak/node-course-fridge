@@ -1,17 +1,16 @@
 import { NextFunction, Request, Response } from "express";
 import { UserStore } from "./user.store.js";
+import { UserBody } from "../../../contracts/user.body.js";
+import { NotFound } from "@panenco/papi";
 
-export const update = (req: Request, res: Response, next: NextFunction) => {
-  const id = Number(req.params.id);
+export const update = (body: UserBody, idString: string) => {
+  const id = Number(idString);
   const user = UserStore.get(id);
 
   if (!user) {
-    return res
-      .status(404)
-      .json({ error: `User with id ${req.params.id} doesn't exist` });
+    throw new NotFound("userNotFound", "User not found");
   }
-  const updated = UserStore.update(id, res.locals.body);
+  const updated = UserStore.update(id, { ...user, ...body });
 
-  res.locals.body = updated;
-  next();
+  return updated;
 };

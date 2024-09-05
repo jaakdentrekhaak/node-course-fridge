@@ -1,7 +1,6 @@
 import { UserStore } from "./user.store.js";
-export const deleteUser = async (req, res, next)=>{
-    UserStore.delete(parseInt(req.params.id));
-    res.send("OK");
+export const deleteUser = (id)=>{
+    UserStore.delete(Number(id));
 };
 
 //# sourceMappingURL=delete.handler.js.map

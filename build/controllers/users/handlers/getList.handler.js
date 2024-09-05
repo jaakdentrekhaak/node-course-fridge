@@ -1,7 +1,10 @@
 import { UserStore } from "./user.store.js";
-export const getList = async (req, res, next)=>{
-    const users = UserStore.find(req.query.search?.toString());
-    res.json(users);
+export const getList = (search)=>{
+    const users = UserStore.find(search);
+    return [
+        users,
+        users.length
+    ];
 };
 
 //# sourceMappingURL=getList.handler.js.map

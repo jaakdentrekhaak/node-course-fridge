@@ -6,6 +6,7 @@ import {
   UserStore,
 } from "../../controllers/users/handlers/user.store.js";
 import { expect } from "chai";
+import { StatusCode } from "@panenco/papi";
 
 describe("Integration tests", () => {
   describe("User Tests", () => {
@@ -26,16 +27,27 @@ describe("Integration tests", () => {
           email: "test-user+1@panenco.com",
           password: "real secret stuff",
         } as Omit<User, "id">)
-        .set("x-auth", "api-key")
-        .expect(200);
+        .expect(StatusCode.created);
 
       expect(UserStore.users.some((x) => x.email === createResponse.email))
         .true;
 
+      // Log created user in
+      const { body: loginBody } = await request
+        .post(`/api/auth/tokens`)
+        .send({
+          email: "test-user+1@panenco.com",
+          password: "real secret stuff",
+        })
+        .expect(StatusCode.ok);
+
+      const token = loginBody.token;
+
       // Get the newly created user
       const { body: getResponse } = await request
         .get(`/api/users/${createResponse.id}`)
-        .expect(200);
+        .set("x-auth", token)
+        .expect(StatusCode.ok);
       expect(getResponse.name).equal("test");
 
       // Successfully update user
@@ -44,7 +56,8 @@ describe("Integration tests", () => {
         .send({
           email: "test-user+updated@panenco.com",
         } as Omit<User, "id" | "name">)
-        .expect(200);
+        .set("x-auth", token)
+        .expect(StatusCode.ok);
 
       expect(updateResponse.name).equal("test");
       expect(updateResponse.email).equal("test-user+updated@panenco.com");
@@ -53,22 +66,29 @@ describe("Integration tests", () => {
       // Get all users
       const { body: getAllResponse } = await request
         .get(`/api/users`)
+        .set("x-auth", token)
         .expect(200);
 
-      const newUser = getAllResponse.find(
-        (x: User) => x.name === getResponse.name
-      );
+      const { items, count } = getAllResponse;
+
+      const newUser = items.find((x: User) => x.name === getResponse.name);
       expect(newUser).not.undefined;
       expect(newUser.email).equal("test-user+updated@panenco.com");
+      expect(count).equal(1);
 
       // Get the newly created user
-      await request.delete(`/api/users/${createResponse.id}`).expect(204);
+      await request
+        .delete(`/api/users/${createResponse.id}`)
+        .set("x-auth", token)
+        .expect(204);
 
       // Get all users again after deleted the only user
       const { body: getNoneResponse } = await request
         .get(`/api/users`)
+        .set("x-auth", token)
         .expect(200);
-      expect(getNoneResponse.length).equal(0);
+      const { count: getNoneCount } = getNoneResponse;
+      expect(getNoneCount).equal(0);
     });
   });
 });

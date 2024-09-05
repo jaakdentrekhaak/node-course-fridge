@@ -1,16 +1,16 @@
 import { UserStore } from "./user.store.js";
-export const update = async (req, res, next)=>{
-    const id = Number(req.params.id);
+import { NotFound } from "@panenco/papi";
+export const update = (body, idString)=>{
+    const id = Number(idString);
     const user = UserStore.get(id);
     if (!user) {
-        return res.status(404).json({
-            error: `User with id ${req.params.id} doesn't exist`
-        });
+        throw new NotFound("userNotFound", "User not found");
     }
-    console.log(req.body);
-    const updated = UserStore.update(id, req.body);
-    res.locals.body = updated;
-    next();
+    const updated = UserStore.update(id, {
+        ...user,
+        ...body
+    });
+    return updated;
 };
 
 //# sourceMappingURL=update.handler.js.map

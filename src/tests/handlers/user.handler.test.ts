@@ -34,115 +34,63 @@ describe("Handler tests", () => {
     });
 
     it("should get users", () => {
-      let res: User[];
-      getList(
-        { query: {} as any } as Request,
-        { json: (val) => (res = val) } as Response,
-        null as NextFunction
-      );
+      const [res, count] = getList(null);
 
       expect(res.some((x) => x.name === "test2")).true;
     });
 
     it("should search users", () => {
-      let res: User[];
-      getList(
-        { query: { search: "test1" } as any } as Request,
-        { json: (val) => (res = val) } as Response,
-        null as NextFunction
-      );
-
+      const [res, count] = getList("test1");
       expect(res.some((x) => x.name === "test1")).true;
     });
 
     it("should get user by id", () => {
-      let res: User;
-      get(
-        { params: { id: "1" } as any } as Request,
-        { json: (val) => (res = val) } as Response,
-        null as NextFunction
-      );
+      const res = get("1");
 
       expect(res.name).equal("test2");
+      expect(res.email).equal("test-user+2@panenco.com");
     });
 
     it("should fail when getting user by unknown id", () => {
-      let res: any;
-      const id = "10";
-      get(
-        { params: { id: id } as any } as Request,
-        { status: (s) => ({ json: (val) => (res = val) }) } as Response,
-        null as NextFunction
-      );
-
-      expect(res.message).equal(`User with id ${id} doesn't exist`);
+      try {
+        get("999");
+      } catch (error) {
+        expect(error.message).equal("User not found");
+        return;
+      }
+      expect(true, "should have thrown an error").false;
     });
 
     it("should create user", async () => {
-      let res: UserView;
-      const body: Omit<User, "id"> = {
-        name: "test3",
-        email: "test-user+3@panenco.com",
-        password: "password3",
-      };
-      await create(
-        { body } as Request,
-        {
-          json: (val) => (res = val),
-        } as Response,
-        null as NextFunction
-      );
-      expect(res.name).equal("test3");
+      const body = {
+        email: "test-user+new@panenco.com",
+        name: "newUser",
+        password: "reallysecretstuff",
+      } as User;
+      const res = await create(body);
+
+      expect(res.name).equal("newUser");
+      expect(res.email).equal("test-user+new@panenco.com");
     });
 
     it("should update user", async () => {
-      const body: Omit<User, "name" | "password" | "id"> = {
+      const body = {
         email: "test-user+updated@panenco.com",
-      };
-      const res = {
-        locals: {
-          body: body,
-        },
-      } as unknown as Response;
+      } as User;
       const id = 0;
-      update(
-        {
-          body,
-          params: { id } as any,
-        } as Request,
-        res,
-        () => null as NextFunction
-      );
+      const res = update(body, id.toString());
 
-      expect(res.locals.body.email).equal(body.email);
-      expect(res.locals.body.name).equal("test1");
+      expect(res.email).equal(body.email);
+      expect(res.name).equal("test1");
       expect(UserStore.users.find((x) => x.id === id).email).equal(body.email);
     });
 
     it("should delete user by id", () => {
       const initialCount = UserStore.users.length;
-      let status: number;
-      let message: string;
-      const res = {
-        status: (code: number) => {
-          status = code;
-          return {
-            send: (data: any) => {
-              message = data;
-            },
-          };
-        },
-      } as Response;
-      deleteUser(
-        { params: { id: "1" } as any } as Request,
-        res,
-        null as NextFunction
-      );
+      deleteUser("1");
 
       expect(UserStore.users.some((x) => x.id === 1)).false;
       expect(initialCount - 1).equal(UserStore.users.length);
-      expect(status).equal(204);
-      expect(message).equal("OK");
     });
   });
 });
